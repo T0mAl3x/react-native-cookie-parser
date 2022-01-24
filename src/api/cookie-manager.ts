@@ -1,10 +1,16 @@
 import SInfo from 'react-native-sensitive-info'
 
+import { parseSetCookieHeader } from '../main-algorithms/parse-set-cookie-header'
+import { storeCookie, StoreFormatCookie } from '../main-algorithms/store-cookie'
+import { canonicalizeDomain } from '../subcomponent-algorithms'
+
 interface RNCookieParserProps {
   getConcatenatedCookies(): Promise<string | null>
-  parseCookiesFromHeader(cookiesHeader: string): string[]
-  getCookieName(cookie: string): string
-  insertCookiesFromHeader(setCookieHeader: string): Promise<void>
+  parseCookiesFromHeader(setCookiesHeader: string): string[] | null
+  insertCookiesFromHeader(
+    setCookieHeader: string,
+    domain: string
+  ): Promise<void>
   // updateCookie(cookieName: string): void
   checkCookieValidity(cookie: string): boolean
   deleteCookie(cookie: string): Promise<void>
@@ -18,10 +24,12 @@ interface RNTokenManagerProps {
 }
 
 export class CookieManager implements RNCookieParserProps {
-  COOKIES: string[] = []
+  PACKED_COOKIES_NAME: string = 'PACKED_COOKIES_NAME'
 
-  constructor(cookieKeys: string[]) {
-    this.COOKIES = [...cookieKeys]
+  constructor(packedCookiesNameInStore: string | null) {
+    if (packedCookiesNameInStore) {
+      this.PACKED_COOKIES_NAME = packedCookiesNameInStore
+    }
   }
 
   async getConcatenatedCookies(): Promise<string | null> {
@@ -56,66 +64,119 @@ export class CookieManager implements RNCookieParserProps {
     return null
   }
 
-  parseCookiesFromHeader(cookiesHeader: string): string[] {
-    const parsed: queryString.ParsedUrl = queryString.parseUrl(
-      'https://pokeapi.co/api/v2/pokemon?offset=10&limit=10'
-    )
-    console.log(parsed)
-    let headers = cookiesHeader.split('; ')
-    let cookies = []
-
-    let cookie = ''
-    headers.forEach((element, index) => {
-      if (this.COOKIES.some((cookieKey) => element.includes(cookieKey))) {
-        if (cookie !== '') {
-          cookies.push(cookie)
-          cookie = ''
-          if (index > 0) cookie = cookie + element + '; '
-        } else {
-          cookie = cookie + element + '; '
-        }
-      } else if (/domain/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('domain', 'Domain') + '; '
-      } else if (/path/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('path', 'Path') + '; '
-      } else if (/expires/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('expires', 'Expires') + '; '
-      } else if (/size/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('size', 'Size') + '; '
-      } else if (/httponly/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('httponly', 'HttpOnly') + '; '
-      } else if (/secure/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('secure', 'Secure') + '; '
-      } else if (/samesite/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('samesite', 'SameSite') + '; '
-      } else if (/priority/.test(element.toLowerCase())) {
-        cookie = cookie + element.replace('priority', 'Priority') + '; '
-      }
-    })
-    if (cookie !== '') {
-      cookies.push(cookie)
-    }
+  parseCookiesFromHeader(setCookiesHeader: string): string[] | null {
+    // Separate cookies from bulk string
+    let cookieRegex = /(.*?)=(.*?)($|;|,(?! ))/g
+    let cookies = setCookiesHeader.match(cookieRegex)
 
     return cookies
   }
 
-  getCookieName(cookie: string): string {
-    let nameValuePair = cookie.split('; ')[0]
-    let cookieName = nameValuePair.split('=')[0]
-    return cookieName
+  getCookiesFromStore(): StoreFormatCookie[] | null {
+    let bulkCookiesFromStore = await SInfo.getItem(this.PACKED_COOKIES_NAME, {
+      sharedPreferencesName: 'auth-prefs',
+      keychainService: 'auth-chain',
+    })
+    let cookiesFromStore = this.parseCookiesFromHeader(bulkCookiesFromStore)
+
+    if (cookiesFromStore) {
+      let cookies = cookiesFromStore.map((cookieFromStore) => {
+        let cookieElements = cookieFromStore.split('; ')
+        let cookieObject: StoreFormatCookie = {
+          name: cookieElements[0],
+          value: cookieElements[1],
+          expiryTime: new Date(cookieElements[2]),
+          domain: cookieElements[3],
+          path: cookieElements[4],
+          creationTime: new Date(cookieElements[5]),
+          lastAccessTime: new Date(cookieElements[6]),
+          persistentFlag: cookieElements[7] === 'true',
+          hostOnlyFlag: cookieElements[8] === 'true',
+          secureOnlyFlag: cookieElements[9] === 'true',
+        }
+
+        return cookieObject
+      })
+
+      return cookies
+    }
+
+    return null
   }
 
-  async insertCookiesFromHeader(setCookieHeader: string): Promise<void> {
+  async insertCookiesFromHeader(
+    setCookieHeader: string,
+    domain: string
+  ): Promise<void> {
     if (setCookieHeader) {
       let cookies = this.parseCookiesFromHeader(setCookieHeader)
-      if (cookies.length > 0) {
+      if (cookies && cookies.length > 0) {
+        // Initialize cookie list with existing cookies from store
+        let existingCookies = this.getCookiesFromStore()
+        let formattedCookiesForStoring: string[] = existingCookies
+          ? [...existingCookies.map((cookieObject) => cookieObject.toString())]
+          : []
+
         for (let i = 0; i < cookies.length; i++) {
-          if (this.checkCookieValidity(cookies[i])) {
-            await SInfo.setItem(this.getCookieName(cookies[i]), cookies[i], {
+          // Parse raw cookie from server
+          let cookie = parseSetCookieHeader(cookies[i])
+
+          if (cookie) {
+            // Prepare cookie for storage
+            let canonicalDomain = canonicalizeDomain(domain)
+            if (canonicalDomain) {
+              let formattedCookie = await storeCookie(cookie, canonicalDomain)
+              /*
+                If the cookie store contains a cookie with the same name,
+                domain, and path as the newly created cookie:
+
+                    1.  Let old-cookie be the existing cookie with the same name,
+                        domain, and path as the newly created cookie.  (Notice that
+                        this algorithm maintains the invariant that there is at most
+                        one such cookie.)
+
+                    3.  Update the creation-time of the newly created cookie to
+                        match the creation-time of the old-cookie.
+
+                    4.  Remove the old-cookie from the cookie store.
+              */
+              if (formattedCookie) {
+                let oldCookie: StoreFormatCookie | null = existingCookies
+                  ? existingCookies.find(
+                      (cookieObject) =>
+                        cookieObject.name === formattedCookie.name &&
+                        cookieObject.domain === formattedCookie.domain &&
+                        cookieObject.path === formattedCookie.path
+                    )
+                  : null
+
+                if (oldCookie) {
+                  for (let i = 0; i < formattedCookiesForStoring.length; i++) {
+                    if (
+                      formattedCookiesForStoring[i].includes(oldCookie.name) &&
+                      formattedCookiesForStoring[i].includes(oldCookie.domain) &&
+                          formattedCookiesForStoring[i].includes(oldCookie.path)
+                      )
+                    )
+                      break
+                  }
+                }
+                formattedCookiesForStoring.push(formattedCookie.toString())
+              }
+            }
+          }
+        }
+
+        if (formattedCookiesForStoring.length > 0) {
+          let packedFormattedCookies = formattedCookiesForStoring.join(', ')
+          await SInfo.setItem(
+            this.PACKED_COOKIES_NAME,
+            packedFormattedCookies,
+            {
               sharedPreferencesName: 'auth-prefs',
               keychainService: 'auth-chain',
-            })
-          }
+            }
+          )
         }
       }
     }

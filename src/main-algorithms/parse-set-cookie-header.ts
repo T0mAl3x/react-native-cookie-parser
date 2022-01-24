@@ -79,6 +79,11 @@ export const parseSetCookieHeader = (setCookieString: string) => {
     If the unparsed-attributes string is empty, skip the rest of
     these steps.
   */
+  let cookie: Cookie = {
+    cookieName,
+    cookieValue,
+    cookieAttributeList: {},
+  }
   while (unparsedAttributes !== '') {
     /*
       Discard the first character of the unparsed-attributes (which
@@ -129,11 +134,6 @@ export const parseSetCookieHeader = (setCookieString: string) => {
       Process the attribute-name and attribute-value. (Notice that
       attributes with unrecognized attribute-names are ignored.)
     */
-    let cookie: Cookie = {
-      cookieName,
-      cookieValue,
-      cookieAttributeList: {},
-    }
     if (/expires/.test(attributeName.toLowerCase())) {
       let expiresDate = processExpiresAttribute(attributeValue)
       if (expiresDate)
@@ -152,4 +152,6 @@ export const parseSetCookieHeader = (setCookieString: string) => {
       cookie.cookieAttributeList.Secure = ''
     }
   }
+
+  return cookie
 }

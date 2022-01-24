@@ -14,3 +14,14 @@ export const matchDomain = (stringToMatch: string, domain: string) => {
 
   return false
 }
+
+export const canonicalizeDomain = (rawDomain: string) => {
+  let canonicalDomainRegex = /@?\b(\w*[^\W\d]+\w*\.+)+[^\W\d_]{2,}\b/g
+  let canonicalDomain = rawDomain.match(canonicalDomainRegex)
+
+  if (canonicalDomain && canonicalDomain.length === 1) {
+    return canonicalDomain[0]
+  }
+
+  return null
+}

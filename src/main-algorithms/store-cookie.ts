@@ -1,16 +1,41 @@
 // RFC 6265
 // 5.3  Storage Model
 
-import SInfo from 'react-native-sensitive-info'
-
 import { matchDomain } from '../subcomponent-algorithms'
 import { Cookie } from './parse-set-cookie-header'
+
+// HttpOnly flag is ignored because it is more specific to browsers
+export class StoreFormatCookie {
+  name: string = ''
+  value: string = ''
+  expiryTime: Date = new Date(8640000000000000)
+  domain: string = ''
+  path: string = '/'
+  creationTime: Date = new Date()
+  lastAccessTime: Date = this.creationTime
+  persistentFlag: boolean = false
+  hostOnlyFlag: boolean = false
+  secureOnlyFlag: boolean = false
+  toString(): string {
+    return [
+      this.name,
+      this.value,
+      this.expiryTime.toLocaleDateString(),
+      this.domain,
+      this.path,
+      this.creationTime.toLocaleDateString(),
+      this.lastAccessTime.toLocaleDateString(),
+      this.persistentFlag.toString(),
+      this.hostOnlyFlag.toString(),
+      this.secureOnlyFlag.toString(),
+    ].join('; ')
+  }
+}
 
 /*
   The user agent stores the following fields about each cookie: name,
   value, expiry-time, domain, path, creation-time, last-access-time,
-  persistent-flag, host-only-flag, secure-only-flag, and http-only-
-  flag.
+  persistent-flag, host-only-flag, secure-only-flag.
 */
 export const storeCookie = async (
   cookie: Cookie,
@@ -29,14 +54,7 @@ export const storeCookie = async (
     Set the creation-time and the last-access-time to the current
     date and time.
   */
-  let expiryTime = new Date(8640000000000000).toLocaleDateString()
-  let domain = ''
-  let path = '/'
-  let creationTime = new Date().toLocaleDateString()
-  let lastAccessTime = creationTime
-  let persistentFlag = false
-  let hostOnlyFlag = false
-  let secureOnlyFlag = false
+  let storeFormatCookie = new StoreFormatCookie()
 
   /*
     If the cookie-attribute-list contains an attribute with an
@@ -66,14 +84,16 @@ export const storeCookie = async (
         date.
   */
   if ('Max-Age' in cookie.cookieAttributeList) {
-    persistentFlag = true
-    expiryTime = cookie.cookieAttributeList['Max-Age']
+    storeFormatCookie.persistentFlag = true
+    storeFormatCookie.expiryTime = new Date(
+      cookie.cookieAttributeList['Max-Age']
+    )
   } else if (
     'Expires' in cookie.cookieAttributeList &&
     !('Max-Age' in cookie.cookieAttributeList)
   ) {
-    persistentFlag = true
-    expiryTime = cookie.cookieAttributeList.Expires
+    storeFormatCookie.persistentFlag = true
+    storeFormatCookie.expiryTime = new Date(cookie.cookieAttributeList.Expires)
   }
 
   /*
@@ -89,7 +109,7 @@ export const storeCookie = async (
         Let the domain-attribute be the empty string.
   */
   if ('Domain' in cookie.cookieAttributeList) {
-    domain = cookie.cookieAttributeList.Domain
+    storeFormatCookie.domain = cookie.cookieAttributeList.Domain
   }
 
   /*
@@ -128,12 +148,12 @@ export const storeCookie = async (
   */
   if (cookie.cookieAttributeList.Domain !== '') {
     if (!matchDomain(canonicalizedDomain, cookie.cookieAttributeList.Domain))
-      return false
+      return null
 
-    domain = cookie.cookieAttributeList.Domain
+    storeFormatCookie.domain = cookie.cookieAttributeList.Domain
   } else {
-    hostOnlyFlag = true
-    domain = canonicalizedDomain
+    storeFormatCookie.hostOnlyFlag = true
+    storeFormatCookie.domain = canonicalizedDomain
   }
 
   /*
@@ -144,7 +164,7 @@ export const storeCookie = async (
     the default-path of the request-uri.
   */
   if ('Path' in cookie.cookieAttributeList) {
-    path = cookie.cookieAttributeList.Path
+    storeFormatCookie.path = cookie.cookieAttributeList.Path
   }
 
   /*
@@ -153,79 +173,12 @@ export const storeCookie = async (
     true.  Otherwise, set the cookie's secure-only-flag to false.
   */
   if ('Secure' in cookie.cookieAttributeList) {
-    secureOnlyFlag = true
-  }
-
-  /*
-    If the cookie store contains a cookie with the same name,
-    domain, and path as the newly created cookie:
-
-        1.  Let old-cookie be the existing cookie with the same name,
-            domain, and path as the newly created cookie.  (Notice that
-            this algorithm maintains the invariant that there is at most
-            one such cookie.)
-
-        3.  Update the creation-time of the newly created cookie to
-            match the creation-time of the old-cookie.
-
-        4.  Remove the old-cookie from the cookie store.
-  */
-  let oldCookie = await parseCookieFromStore(cookie.cookieName)
-  if (oldCookie) {
-    if (oldCookie.domain === domain && oldCookie.path === path) {
-      creationTime = oldCookie.creationTime
-      await removeCookieFromStore(oldCookie.name)
-    }
+    storeFormatCookie.secureOnlyFlag = true
   }
 
   let currentTimeMillis = new Date().getMilliseconds()
-  let expiryTimeMillis = Date.parse(expiryTime)
+  let expiryTimeMillis = storeFormatCookie.expiryTime.getMilliseconds()
   if (expiryTimeMillis > currentTimeMillis) {
-    let cookieValue = [
-      cookie.cookieName,
-      cookie.cookieValue,
-      expiryTime,
-      domain,
-      path,
-      creationTime,
-      lastAccessTime,
-      persistentFlag.toString(),
-      hostOnlyFlag.toString(),
-      secureOnlyFlag.toString(),
-    ].join(';')
-    await SInfo.setItem(cookie.cookieName, cookieValue, {
-      sharedPreferencesName: 'auth-prefs',
-      keychainService: 'auth-chain',
-    })
+    return storeFormatCookie
   }
-}
-
-export const parseCookieFromStore = async (cookieName: string) => {
-  let cookie = await SInfo.getItem(cookieName, {
-    sharedPreferencesName: 'auth-prefs',
-    keychainService: 'auth-chain',
-  })
-  if (!cookie) return null
-  let cookieElements = cookie.split(';')
-  if (cookieElements.length !== 10) return null
-
-  return {
-    name: cookieElements[0],
-    value: cookieElements[1],
-    expiryTime: cookieElements[2],
-    domain: cookieElements[3],
-    path: cookieElements[4],
-    creationTime: cookieElements[5],
-    lastAccessTime: cookieElements[6],
-    persistentFlag: cookieElements[7],
-    hostOnlyFlag: cookieElements[8],
-    secureOnlyFlag: cookieElements[9],
-  }
-}
-
-export const removeCookieFromStore = async (cookieName: string) => {
-  await SInfo.deleteItem(cookieName, {
-    sharedPreferencesName: 'auth-prefs',
-    keychainService: 'auth-chain',
-  })
 }
