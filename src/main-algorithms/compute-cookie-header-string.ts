@@ -22,16 +22,16 @@ export const computeCookieHeaderString = (
     let currentDateTime = new Date()
     existingCookies.forEach((cookie) => {
       /*
-            Either:
-  
-              The cookie's host-only-flag is true and the canonicalized
-              request-host is identical to the cookie's domain.
-  
-            Or:
-  
-              The cookie's host-only-flag is false and the canonicalized
-              request-host domain-matches the cookie's domain.
-          */
+              Either:
+    
+                The cookie's host-only-flag is true and the canonicalized
+                request-host is identical to the cookie's domain.
+    
+              Or:
+    
+                The cookie's host-only-flag is false and the canonicalized
+                request-host domain-matches the cookie's domain.
+            */
       if (
         ((cookie.hostOnlyFlag && canonicalizedDomain === cookie.domain) ||
           (!cookie.hostOnlyFlag &&
@@ -39,10 +39,10 @@ export const computeCookieHeaderString = (
         // The request-uri's path path-matches the cookie's path.
         matchPath(getUriPath(uri), cookie.path) &&
         /*
-              If the cookie's secure-only-flag is true, then the request-
-              uri's scheme must denote a "secure" protocol (as defined by
-              the user agent).
-            */
+                If the cookie's secure-only-flag is true, then the request-
+                uri's scheme must denote a "secure" protocol (as defined by
+                the user agent).
+              */
         ((cookie.secureOnlyFlag && isSecureProtocol) || !cookie.secureOnlyFlag)
       ) {
         cookie.lastAccessTime = currentDateTime
