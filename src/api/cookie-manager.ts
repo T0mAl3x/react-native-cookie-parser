@@ -1,19 +1,19 @@
 import SInfo from 'react-native-sensitive-info'
 
+import { computeCookieHeaderString } from '../main-algorithms/compute-cookie-header-string'
 import { parseSetCookieHeader } from '../main-algorithms/parse-set-cookie-header'
-import { storeCookie, StoreFormatCookie } from '../main-algorithms/store-cookie'
+import {
+  formatCookieForStoring,
+  StoreFormatCookie,
+} from '../main-algorithms/store-cookie'
 import { canonicalizeDomain } from '../subcomponent-algorithms'
 
 interface RNCookieParserProps {
-  getConcatenatedCookies(): Promise<string | null>
-  parseCookiesFromHeader(setCookiesHeader: string): string[] | null
+  getConcatenatedCookies(domain: string): Promise<string | null>
   insertCookiesFromHeader(
     setCookieHeader: string,
     domain: string
   ): Promise<void>
-  // updateCookie(cookieName: string): void
-  checkCookieValidity(cookie: string): boolean
-  deleteCookie(cookie: string): Promise<void>
   clear(): Promise<void>
 }
 
@@ -26,41 +26,55 @@ interface RNTokenManagerProps {
 export class CookieManager implements RNCookieParserProps {
   PACKED_COOKIES_NAME: string = 'PACKED_COOKIES_NAME'
 
-  constructor(packedCookiesNameInStore: string | null) {
+  constructor(packedCookiesNameInStore: string | null = null) {
     if (packedCookiesNameInStore) {
       this.PACKED_COOKIES_NAME = packedCookiesNameInStore
     }
   }
 
-  async getConcatenatedCookies(): Promise<string | null> {
-    let cookies: string[] = []
+  async removeExpiredCookiesFromStore() {
+    let existingCookies = await this.getCookiesFromStore()
+    if (existingCookies) {
+      let updatedCookieList = [...existingCookies]
+      let currentDate = new Date().getMilliseconds()
+      for (let i = 0; i < existingCookies.length; i++) {
+        if (existingCookies[i].expiryTime.getMilliseconds() <= currentDate) {
+          updatedCookieList = updatedCookieList.slice(i, i + 1)
+        }
+      }
 
-    for (let i = 0; i < this.COOKIES.length; i++) {
-      let cookie = await SInfo.getItem(this.COOKIES[i], {
+      let formattedCookieList = updatedCookieList.map((cookie) =>
+        cookie.toString()
+      )
+      await this.savePackedCookiesToStore(formattedCookieList)
+    }
+  }
+
+  async savePackedCookiesToStore(packedCookies: string[]) {
+    if (packedCookies.length > 0) {
+      let packedFormattedCookies = packedCookies.join(', ')
+      await SInfo.setItem(this.PACKED_COOKIES_NAME, packedFormattedCookies, {
         sharedPreferencesName: 'auth-prefs',
         keychainService: 'auth-chain',
       })
-
-      if (cookie) {
-        cookies.push(cookie)
-      }
     }
-    console.log(cookies)
-    if (cookies.length === 0) return null
+  }
 
-    let concatCookies = ''
-    let expiredFlag = false
+  async getConcatenatedCookies(uri: string): Promise<string | null> {
+    /*
+      A user agent MAY omit the Cookie header in its entirety.  For
+      example, the user agent might wish to block sending cookies during
+      "third-party" requests from setting cookies.
+    */
+    // TODO mechanism of user agent settings
 
-    for (let i = 0; i < cookies.length - 1; i++) {
-      if (!this.checkCookieValidity(cookies[i])) {
-        await this.deleteCookie(cookies[i])
-        expiredFlag = true
-        break
-      }
-      concatCookies += cookies[i] + '; '
-    }
+    // Check store for expired cookies
+    this.removeExpiredCookiesFromStore()
 
-    if (!expiredFlag) return concatCookies
+    let existingCookies = await this.getCookiesFromStore()
+    let computedCookies = computeCookieHeaderString(existingCookies, uri)
+    if (computedCookies) return computedCookies.join('; ')
+
     return null
   }
 
@@ -72,7 +86,7 @@ export class CookieManager implements RNCookieParserProps {
     return cookies
   }
 
-  getCookiesFromStore(): StoreFormatCookie[] | null {
+  async getCookiesFromStore(): Promise<StoreFormatCookie[] | null> {
     let bulkCookiesFromStore = await SInfo.getItem(this.PACKED_COOKIES_NAME, {
       sharedPreferencesName: 'auth-prefs',
       keychainService: 'auth-chain',
@@ -82,18 +96,18 @@ export class CookieManager implements RNCookieParserProps {
     if (cookiesFromStore) {
       let cookies = cookiesFromStore.map((cookieFromStore) => {
         let cookieElements = cookieFromStore.split('; ')
-        let cookieObject: StoreFormatCookie = {
-          name: cookieElements[0],
-          value: cookieElements[1],
-          expiryTime: new Date(cookieElements[2]),
-          domain: cookieElements[3],
-          path: cookieElements[4],
-          creationTime: new Date(cookieElements[5]),
-          lastAccessTime: new Date(cookieElements[6]),
-          persistentFlag: cookieElements[7] === 'true',
-          hostOnlyFlag: cookieElements[8] === 'true',
-          secureOnlyFlag: cookieElements[9] === 'true',
-        }
+        let cookieObject: StoreFormatCookie = new StoreFormatCookie(
+          cookieElements[0],
+          cookieElements[1],
+          new Date(cookieElements[2]),
+          cookieElements[3],
+          cookieElements[4],
+          new Date(cookieElements[5]),
+          new Date(cookieElements[6]),
+          cookieElements[7] === 'true',
+          cookieElements[8] === 'true',
+          cookieElements[9] === 'true'
+        )
 
         return cookieObject
       })
@@ -111,8 +125,11 @@ export class CookieManager implements RNCookieParserProps {
     if (setCookieHeader) {
       let cookies = this.parseCookiesFromHeader(setCookieHeader)
       if (cookies && cookies.length > 0) {
+        // Check store for expired cookies
+        this.removeExpiredCookiesFromStore()
+
         // Initialize cookie list with existing cookies from store
-        let existingCookies = this.getCookiesFromStore()
+        let existingCookies = await this.getCookiesFromStore()
         let formattedCookiesForStoring: string[] = existingCookies
           ? [...existingCookies.map((cookieObject) => cookieObject.toString())]
           : []
@@ -125,7 +142,10 @@ export class CookieManager implements RNCookieParserProps {
             // Prepare cookie for storage
             let canonicalDomain = canonicalizeDomain(domain)
             if (canonicalDomain) {
-              let formattedCookie = await storeCookie(cookie, canonicalDomain)
+              let formattedCookie = await formatCookieForStoring(
+                cookie,
+                canonicalDomain
+              )
               /*
                 If the cookie store contains a cookie with the same name,
                 domain, and path as the newly created cookie:
@@ -141,25 +161,44 @@ export class CookieManager implements RNCookieParserProps {
                     4.  Remove the old-cookie from the cookie store.
               */
               if (formattedCookie) {
-                let oldCookie: StoreFormatCookie | null = existingCookies
-                  ? existingCookies.find(
-                      (cookieObject) =>
-                        cookieObject.name === formattedCookie.name &&
-                        cookieObject.domain === formattedCookie.domain &&
-                        cookieObject.path === formattedCookie.path
-                    )
-                  : null
-
-                if (oldCookie) {
-                  for (let i = 0; i < formattedCookiesForStoring.length; i++) {
-                    if (
-                      formattedCookiesForStoring[i].includes(oldCookie.name) &&
-                      formattedCookiesForStoring[i].includes(oldCookie.domain) &&
-                          formattedCookiesForStoring[i].includes(oldCookie.path)
+                let oldCookie: StoreFormatCookie | undefined | null =
+                  existingCookies
+                    ? existingCookies.find(
+                        (cookieObject) =>
+                          cookieObject.name === formattedCookie!.name &&
+                          cookieObject.domain === formattedCookie!.domain &&
+                          cookieObject.path === formattedCookie!.path
                       )
-                    )
+                    : null
+
+                let indexOfCookieToBeRemoved = -1
+                if (oldCookie) {
+                  for (let j = 0; j < formattedCookiesForStoring.length; j++) {
+                    if (
+                      formattedCookiesForStoring[j].includes(oldCookie.name) &&
+                      formattedCookiesForStoring[j].includes(
+                        oldCookie.domain
+                      ) &&
+                      formattedCookiesForStoring[j].includes(oldCookie.path)
+                    ) {
+                      if (
+                        formattedCookie.expiryTime.getMilliseconds() <=
+                        new Date().getMilliseconds()
+                      ) {
+                        indexOfCookieToBeRemoved = j
+                      } else {
+                        formattedCookiesForStoring[j] =
+                          formattedCookie.toString()
+                      }
                       break
+                    }
                   }
+                }
+                if (indexOfCookieToBeRemoved !== -1) {
+                  formattedCookiesForStoring = formattedCookiesForStoring.slice(
+                    indexOfCookieToBeRemoved,
+                    indexOfCookieToBeRemoved + 1
+                  )
                 }
                 formattedCookiesForStoring.push(formattedCookie.toString())
               }
@@ -167,55 +206,13 @@ export class CookieManager implements RNCookieParserProps {
           }
         }
 
-        if (formattedCookiesForStoring.length > 0) {
-          let packedFormattedCookies = formattedCookiesForStoring.join(', ')
-          await SInfo.setItem(
-            this.PACKED_COOKIES_NAME,
-            packedFormattedCookies,
-            {
-              sharedPreferencesName: 'auth-prefs',
-              keychainService: 'auth-chain',
-            }
-          )
-        }
+        await this.savePackedCookiesToStore(formattedCookiesForStoring)
       }
     }
   }
 
-  //   updateCookie(cookieName: string): void {
-  //     throw new Error('Method not implemented.')
-  //   }
-
-  async deleteCookie(cookie: string): Promise<void> {
-    let cookieName = this.getCookieName(cookie)
-
-    await SInfo.deleteItem(cookieName, {
-      sharedPreferencesName: 'auth-prefs',
-      keychainService: 'auth-chain',
-    })
-  }
-
-  checkCookieValidity(cookie: string): boolean {
-    let splittedAttributes = cookie.split('; ')
-    let expires = splittedAttributes.filter((element) =>
-      element.includes('Expires')
-    )
-    if (expires.length === 0) return false
-    let expiresDate = Date.parse(expires[0].split('=')[1])
-    let currentDate = new Date().getTime()
-    console.log(currentDate > expiresDate)
-
-    if (currentDate > expiresDate) return false
-    return true
-  }
-
   async clear(): Promise<void> {
-    for (let i = 0; i < this.COOKIES.length; i++) {
-      await SInfo.deleteItem(this.COOKIES[i], {
-        sharedPreferencesName: 'auth-prefs',
-        keychainService: 'auth-chain',
-      })
-    }
+    // TODO not implemented
   }
 }
 
