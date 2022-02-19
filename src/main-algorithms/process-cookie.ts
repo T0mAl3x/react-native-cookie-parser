@@ -11,7 +11,7 @@ export const processExpiresAttribute = (attributeValue: string) => {
   */
   if (isNaN(expiryTime)) return null
 
-  return new Date(expiryTime)
+  return expiryTime
 }
 
 export const processMaxAgeAttribute = (attributeValue: string) => {

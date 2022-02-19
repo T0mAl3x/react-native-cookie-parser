@@ -45,11 +45,11 @@ export class StoreFormatCookie {
     return [
       this.name,
       this.value,
-      this.expiryTime.toLocaleDateString(),
+      this.expiryTime.toLocaleString(),
       this.domain,
       this.path,
-      this.creationTime.toLocaleDateString(),
-      this.lastAccessTime.toLocaleDateString(),
+      this.creationTime.toLocaleString(),
+      this.lastAccessTime.toLocaleString(),
       this.persistentFlag.toString(),
       this.hostOnlyFlag.toString(),
       this.secureOnlyFlag.toString(),
@@ -84,6 +84,8 @@ export const formatCookieForStoring = async (
       date and time.
     */
     let storeFormatCookie = new StoreFormatCookie()
+    storeFormatCookie.name = cookie.cookieName
+    storeFormatCookie.value = cookie.cookieValue
 
     /*
       If the cookie-attribute-list contains an attribute with an
@@ -115,7 +117,7 @@ export const formatCookieForStoring = async (
     if ('Max-Age' in cookie.cookieAttributeList) {
       storeFormatCookie.persistentFlag = true
       storeFormatCookie.expiryTime = new Date(
-        cookie.cookieAttributeList['Max-Age']
+        Number(cookie.cookieAttributeList['Max-Age'])
       )
     } else if (
       'Expires' in cookie.cookieAttributeList &&
@@ -123,7 +125,7 @@ export const formatCookieForStoring = async (
     ) {
       storeFormatCookie.persistentFlag = true
       storeFormatCookie.expiryTime = new Date(
-        cookie.cookieAttributeList.Expires
+        Number(cookie.cookieAttributeList.Expires)
       )
     }
 
@@ -177,7 +179,7 @@ export const formatCookieForStoring = async (
   
           Set the cookie's domain to the canonicalized request-host.
     */
-    if (cookie.cookieAttributeList.Domain !== '') {
+    if (cookie.cookieAttributeList.Domain) {
       if (!matchDomain(canonicalizedDomain, cookie.cookieAttributeList.Domain))
         return null
 
@@ -208,7 +210,8 @@ export const formatCookieForStoring = async (
     }
 
     return storeFormatCookie
-  } finally {
+  } catch (err) {
+    console.log(err)
     return null
   }
 }

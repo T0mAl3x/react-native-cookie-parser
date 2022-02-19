@@ -80,8 +80,7 @@ export class CookieManager implements RNCookieParserProps {
 
   parseCookiesFromHeader(setCookiesHeader: string): string[] | null {
     // Separate cookies from bulk string
-    let cookieRegex = /(.*?)=(.*?)($|;|,(?! ))/g
-    let cookies = setCookiesHeader.match(cookieRegex)
+    let cookies = setCookiesHeader.split(', ')
 
     return cookies
   }
@@ -91,6 +90,8 @@ export class CookieManager implements RNCookieParserProps {
       sharedPreferencesName: 'auth-prefs',
       keychainService: 'auth-chain',
     })
+    if (!bulkCookiesFromStore) return null
+
     let cookiesFromStore = this.parseCookiesFromHeader(bulkCookiesFromStore)
 
     if (cookiesFromStore) {
@@ -130,14 +131,14 @@ export class CookieManager implements RNCookieParserProps {
 
         // Initialize cookie list with existing cookies from store
         let existingCookies = await this.getCookiesFromStore()
-        let formattedCookiesForStoring: string[] = existingCookies
-          ? [...existingCookies.map((cookieObject) => cookieObject.toString())]
-          : []
+        if (!existingCookies) existingCookies = []
 
+        console.log('Initialize cookie list with existing cookies from store')
+        console.log(existingCookies)
         for (let i = 0; i < cookies.length; i++) {
           // Parse raw cookie from server
           let cookie = parseSetCookieHeader(cookies[i])
-
+          console.log(cookie)
           if (cookie) {
             // Prepare cookie for storage
             let canonicalDomain = canonicalizeDomain(domain)
@@ -146,6 +147,7 @@ export class CookieManager implements RNCookieParserProps {
                 cookie,
                 canonicalDomain
               )
+              console.log(formattedCookie)
               /*
                 If the cookie store contains a cookie with the same name,
                 domain, and path as the newly created cookie:
@@ -161,58 +163,42 @@ export class CookieManager implements RNCookieParserProps {
                     4.  Remove the old-cookie from the cookie store.
               */
               if (formattedCookie) {
-                let oldCookie: StoreFormatCookie | undefined | null =
-                  existingCookies
-                    ? existingCookies.find(
-                        (cookieObject) =>
-                          cookieObject.name === formattedCookie!.name &&
-                          cookieObject.domain === formattedCookie!.domain &&
-                          cookieObject.path === formattedCookie!.path
-                      )
-                    : null
+                let oldCookieIndex: number = existingCookies.findIndex(
+                  (cookieObject) =>
+                    cookieObject.name === formattedCookie!.name &&
+                    cookieObject.domain === formattedCookie!.domain &&
+                    cookieObject.path === formattedCookie!.path
+                )
 
-                let indexOfCookieToBeRemoved = -1
-                if (oldCookie) {
-                  for (let j = 0; j < formattedCookiesForStoring.length; j++) {
-                    if (
-                      formattedCookiesForStoring[j].includes(oldCookie.name) &&
-                      formattedCookiesForStoring[j].includes(
-                        oldCookie.domain
-                      ) &&
-                      formattedCookiesForStoring[j].includes(oldCookie.path)
-                    ) {
-                      if (
-                        formattedCookie.expiryTime.getMilliseconds() <=
-                        new Date().getMilliseconds()
-                      ) {
-                        indexOfCookieToBeRemoved = j
-                      } else {
-                        formattedCookiesForStoring[j] =
-                          formattedCookie.toString()
-                      }
-                      break
-                    }
-                  }
-                }
-                if (indexOfCookieToBeRemoved !== -1) {
-                  formattedCookiesForStoring = formattedCookiesForStoring.slice(
-                    indexOfCookieToBeRemoved,
-                    indexOfCookieToBeRemoved + 1
+                if (oldCookieIndex !== -1) {
+                  let oldCookie = existingCookies[oldCookieIndex]
+                  formattedCookie.creationTime = oldCookie.creationTime
+                  existingCookies = existingCookies.slice(
+                    oldCookieIndex,
+                    oldCookieIndex + 1
                   )
                 }
-                formattedCookiesForStoring.push(formattedCookie.toString())
+
+                existingCookies.push(formattedCookie)
               }
             }
           }
         }
 
+        let formattedCookiesForStoring: string[] = [
+          ...existingCookies.map((cookieObject) => cookieObject.toString()),
+        ]
+        console.log(formattedCookiesForStoring)
         await this.savePackedCookiesToStore(formattedCookiesForStoring)
       }
     }
   }
 
   async clear(): Promise<void> {
-    // TODO not implemented
+    await SInfo.deleteItem(this.PACKED_COOKIES_NAME, {
+      sharedPreferencesName: 'auth-prefs',
+      keychainService: 'auth-chain',
+    })
   }
 }
 

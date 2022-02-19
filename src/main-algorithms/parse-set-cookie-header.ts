@@ -89,7 +89,7 @@ export const parseSetCookieHeader = (setCookieString: string) => {
       Discard the first character of the unparsed-attributes (which
       will be a %x3B (";") character).
     */
-    unparsedAttributes = unparsedAttributes.substring(1)
+    unparsedAttributes = unparsedAttributes.substring(1).trim()
 
     /*
       If the remaining unparsed-attributes contains a %x3B (";")
@@ -104,14 +104,15 @@ export const parseSetCookieHeader = (setCookieString: string) => {
     */
     let cookieAv = ''
     if (unparsedAttributes.includes(';')) {
-      cookieAv = unparsedAttributes.substring(
-        0,
-        unparsedAttributes.indexOf(';')
-      )
+      cookieAv = unparsedAttributes
+        .substring(0, unparsedAttributes.indexOf(';'))
+        .trim()
     } else {
-      cookieAv = unparsedAttributes.substring(0, unparsedAttributes.length)
+      cookieAv = unparsedAttributes
+        .substring(0, unparsedAttributes.length)
+        .trim()
     }
-    unparsedAttributes = unparsedAttributes.substring(0, cookieAv.length)
+    unparsedAttributes = unparsedAttributes.substring(cookieAv.length).trim()
 
     let { attributeName, attributeValue } = cookieAv.includes('=')
       ? {
@@ -136,12 +137,11 @@ export const parseSetCookieHeader = (setCookieString: string) => {
     */
     if (/expires/.test(attributeName.toLowerCase())) {
       let expiresDate = processExpiresAttribute(attributeValue)
-      if (expiresDate)
-        cookie.cookieAttributeList.Expires = expiresDate.toLocaleDateString()
+      if (expiresDate) cookie.cookieAttributeList.Expires = String(expiresDate)
     } else if (/max-age/.test(attributeName.toLowerCase())) {
       let expiresDate = processMaxAgeAttribute(attributeValue)
       if (expiresDate)
-        cookie.cookieAttributeList['Max-Age'] = expiresDate.toLocaleDateString()
+        cookie.cookieAttributeList['Max-Age'] = String(expiresDate)
     } else if (/domain/.test(attributeName.toLowerCase())) {
       let cookieDomain = processDomainAttribute(attributeValue)
       if (cookieDomain) cookie.cookieAttributeList.Domain = cookieDomain
