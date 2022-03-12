@@ -93,10 +93,11 @@ export class CookieManager implements RNCookieParserProps {
     if (!bulkCookiesFromStore) return null
 
     let cookiesFromStore = this.parseCookiesFromHeader(bulkCookiesFromStore)
-
     if (cookiesFromStore) {
       let cookies = cookiesFromStore.map((cookieFromStore) => {
         let cookieElements = cookieFromStore.split('; ')
+        console.log(cookieElements[2])
+        console.log(new Date(cookieElements[2]))
         let cookieObject: StoreFormatCookie = new StoreFormatCookie(
           cookieElements[0],
           cookieElements[1],
@@ -124,6 +125,7 @@ export class CookieManager implements RNCookieParserProps {
     domain: string
   ): Promise<void> {
     if (setCookieHeader) {
+      // await this.clear()
       let cookies = this.parseCookiesFromHeader(setCookieHeader)
       if (cookies && cookies.length > 0) {
         // Check store for expired cookies
@@ -135,6 +137,7 @@ export class CookieManager implements RNCookieParserProps {
 
         console.log('Initialize cookie list with existing cookies from store')
         console.log(existingCookies)
+
         for (let i = 0; i < cookies.length; i++) {
           // Parse raw cookie from server
           let cookie = parseSetCookieHeader(cookies[i])
@@ -147,7 +150,7 @@ export class CookieManager implements RNCookieParserProps {
                 cookie,
                 canonicalDomain
               )
-              console.log(formattedCookie)
+
               /*
                 If the cookie store contains a cookie with the same name,
                 domain, and path as the newly created cookie:
@@ -173,10 +176,7 @@ export class CookieManager implements RNCookieParserProps {
                 if (oldCookieIndex !== -1) {
                   let oldCookie = existingCookies[oldCookieIndex]
                   formattedCookie.creationTime = oldCookie.creationTime
-                  existingCookies = existingCookies.slice(
-                    oldCookieIndex,
-                    oldCookieIndex + 1
-                  )
+                  existingCookies.splice(oldCookieIndex, oldCookieIndex + 1)
                 }
 
                 existingCookies.push(formattedCookie)
@@ -188,7 +188,7 @@ export class CookieManager implements RNCookieParserProps {
         let formattedCookiesForStoring: string[] = [
           ...existingCookies.map((cookieObject) => cookieObject.toString()),
         ]
-        console.log(formattedCookiesForStoring)
+
         await this.savePackedCookiesToStore(formattedCookiesForStoring)
       }
     }

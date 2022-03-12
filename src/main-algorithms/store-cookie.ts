@@ -8,7 +8,7 @@ import { Cookie } from './parse-set-cookie-header'
 export class StoreFormatCookie {
   name: string = ''
   value: string = ''
-  expiryTime: Date = new Date(8640000000000000)
+  expiryTime: Date = new Date(864000000000000)
   domain: string = ''
   path: string = '/'
   creationTime: Date = new Date()
@@ -20,7 +20,7 @@ export class StoreFormatCookie {
   constructor(
     name: string = '',
     value: string = '',
-    expiryTime: Date = new Date(8640000000000000),
+    expiryTime: Date = new Date(864000000000000),
     domain: string = '',
     path: string = '',
     creationTime: Date = new Date(),
@@ -45,11 +45,11 @@ export class StoreFormatCookie {
     return [
       this.name,
       this.value,
-      this.expiryTime.toLocaleString(),
+      this.expiryTime.toLocaleString().replace(',', ''),
       this.domain,
       this.path,
-      this.creationTime.toLocaleString(),
-      this.lastAccessTime.toLocaleString(),
+      this.creationTime.toLocaleString().replace(',', ''),
+      this.lastAccessTime.toLocaleString().replace(',', ''),
       this.persistentFlag.toString(),
       this.hostOnlyFlag.toString(),
       this.secureOnlyFlag.toString(),

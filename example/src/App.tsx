@@ -18,7 +18,7 @@ const App = () => {
   useEffect(() => {
     let tstCookies = async () => {
       await cookieManager.insertCookiesFromHeader(
-        "A=B; path=/; expires=2022-02-19T13:06:49Z; domain=devadmin.wiredent.ro; secure, C=Z; path=/, E=G; path=/",
+        "A=B; path=/; expires=2022-03-19T13:06:49Z; domain=devadmin.wiredent.ro; secure, C=Z; path=/, E=G; path=/",
         "https://devadmin.wiredent.ro/"
       )
       setCookies(true)
