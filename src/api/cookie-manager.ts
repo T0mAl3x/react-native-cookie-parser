@@ -34,19 +34,14 @@ export class CookieManager implements RNCookieParserProps {
 
   async removeExpiredCookiesFromStore(): Promise<void> {
     let existingCookies = await this.getCookiesFromStore()
-    console.log('removeExpiredCookiesFromStore')
     if (existingCookies) {
-      console.log(existingCookies)
       let updatedCookieList = [...existingCookies]
       let currentDate = new Date().getTime()
       for (let i = 0; i < existingCookies.length; i++) {
         if (existingCookies[i].expiryTime.getTime() <= currentDate) {
-          console.log('Yes')
-          console.log(existingCookies[i])
           updatedCookieList.splice(i, i + 1)
         }
       }
-      console.log(updatedCookieList)
       let formattedCookieList = updatedCookieList.map((cookie) =>
         cookie.toString()
       )
@@ -61,7 +56,6 @@ export class CookieManager implements RNCookieParserProps {
         sharedPreferencesName: 'auth-prefs',
         keychainService: 'auth-chain',
       })
-      console.log("savePackedCookiesToStore")
     }
   }
 
