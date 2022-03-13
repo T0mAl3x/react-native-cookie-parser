@@ -1,30 +1,14 @@
 {
   "name": "react-native-cookie-parser",
-  "version": "1.0.1",
-  "description": "",
+  "version": "1.0.3",
+  "description": "Basic cookie parser for react-native",
   "homepage": "https://github.com/T0mAl3x/react-native-cookie-parser#readme",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "author": "Tomei Alexandru <alexandru.tomei@gmail.com>",
   "license": "MIT",
   "files": [
-    "android",
-    "ios",
-    "lib",
-    "react-native-cookie-parser.podspec",
-    "!android/build",
-    "!.DS_Store",
-    "!.gradle",
-    "!.idea",
-    "!build",
-    "!gradle",
-    "!*.iml",
-    "!gradlew",
-    "!gradlew.bat",
-    "!local.properties",
-    "!project.xcworkspace",
-    "!xcshareddata",
-    "!xcuserdata"
+    "lib"
   ],
   "scripts": {
     "compile": "rm -rf lib && tsc -p .",

@@ -3,8 +3,7 @@ This library is a basic cookie parser which uses the algorithms defined in RFC 6
 ### **External dependencies**
 [react-native-sensitive-info](https://github.com/mcodex/react-native-sensitive-info) is used as the storage manager
 
-[react-native-url-polyfill
-](https://github.com/charpeni/react-native-url-polyfill) is used to parse URLs
+[react-native-url-polyfill](https://github.com/charpeni/react-native-url-polyfill) is used to parse URLs
 
 ### **Install**
 `yarn add react-native-cookie-parser`
@@ -30,17 +29,4 @@ This library is a basic cookie parser which uses the algorithms defined in RFC 6
 
     // Clear store (usually on logout)
     await cookieManager.clear()
-
 On every insert/get the expired cookies are removed
-
-If you want to store additional tokens you can use TokenManager
-
-    import { TokenManager } from 'react-native-cookie-parser'
-
-    const tokenManager = new TokenManager()
-
-    await tokenManager.setAuthTokens({"a": "b", "c": "d", "e": "f"})
-    let tokens = await tokenManager.getAuthTokens()
-
-    // Clear store
-    await tokenManager.wipeAuthTokens()
