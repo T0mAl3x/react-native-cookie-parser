@@ -32,3 +32,15 @@ This library is a basic cookie parser which uses the algorithms defined in RFC 6
     await cookieManager.clear()
 
 On every insert/get the expired cookies are removed
+
+If you want to store additional tokens you can use TokenManager
+
+    import { TokenManager } from 'react-native-cookie-parser'
+
+    const tokenManager = new TokenManager()
+
+    await tokenManager.setAuthTokens({"a": "b", "c": "d", "e": "f"})
+    let tokens = await tokenManager.getAuthTokens()
+
+    // Clear store
+    await tokenManager.wipeAuthTokens()

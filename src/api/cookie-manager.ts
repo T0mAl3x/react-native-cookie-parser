@@ -200,43 +200,49 @@ export class CookieManager implements RNCookieParserProps {
 }
 
 export class TokenManager implements RNTokenManagerProps {
-  TOKENS: string[] = []
+  PACKED_TOKENS_NAME: string = 'PACKED_TOKENS_NAME'
 
-  constructor(tokenKeys: string[]) {
-    this.TOKENS = [...tokenKeys]
+  constructor(packedTokensNameInStore: string | null = null) {
+    if (packedTokensNameInStore) {
+      this.PACKED_TOKENS_NAME = packedTokensNameInStore
+    }
   }
 
   async setAuthTokens(tokens: { [key: string]: string }): Promise<void> {
-    this.TOKENS.forEach(async (tokenKey) => {
-      if (tokenKey in Object.keys(tokens)) {
-        await SInfo.setItem(tokenKey, tokens.tokenKey, {
-          sharedPreferencesName: 'auth-prefs',
-          keychainService: 'auth-chain',
-        })
-      }
-    })
+    if (tokens) {
+      let tokenKeys = Object.keys(tokens)
+      let packedTokens = tokenKeys.map((key) => `${key}=${tokens[key]}`)
+
+      await SInfo.setItem(this.PACKED_TOKENS_NAME, packedTokens.join(', '), {
+        sharedPreferencesName: 'auth-prefs',
+        keychainService: 'auth-chain',
+      })
+    }
   }
 
   async getAuthTokens(): Promise<{ [key: string]: string }> {
     let tokens: { [key: string]: string } = {}
 
-    this.TOKENS.forEach(async (tokenKey: string) => {
-      let token = await SInfo.getItem(tokenKey, {
-        sharedPreferencesName: 'auth-prefs',
-        keychainService: 'auth-chain',
-      })
-      tokens.tokenKey = token
+    let packedTokens = await SInfo.getItem(this.PACKED_TOKENS_NAME, {
+      sharedPreferencesName: 'auth-prefs',
+      keychainService: 'auth-chain',
     })
+
+    if (packedTokens) {
+      let packedTokensList = packedTokens.split(', ')
+      packedTokensList.forEach((token) => {
+        let splittedToken = token.split('=')
+        tokens[splittedToken[0]] = splittedToken[1]
+      })
+    }
 
     return tokens
   }
 
   async wipeAuthTokens(): Promise<void> {
-    this.TOKENS.forEach(async (tokenKey: string) => {
-      await SInfo.deleteItem(tokenKey, {
-        sharedPreferencesName: 'auth-prefs',
-        keychainService: 'auth-chain',
-      })
+    await SInfo.deleteItem(this.PACKED_TOKENS_NAME, {
+      sharedPreferencesName: 'auth-prefs',
+      keychainService: 'auth-chain',
     })
   }
 }
