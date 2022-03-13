@@ -8,7 +8,7 @@ import { Cookie } from './parse-set-cookie-header'
 export class StoreFormatCookie {
   name: string = ''
   value: string = ''
-  expiryTime: Date = new Date(864000000000000)
+  expiryTime: Date = new Date(86400000000000)
   domain: string = ''
   path: string = '/'
   creationTime: Date = new Date()
@@ -20,7 +20,7 @@ export class StoreFormatCookie {
   constructor(
     name: string = '',
     value: string = '',
-    expiryTime: Date = new Date(864000000000000),
+    expiryTime: Date = new Date(86400000000000),
     domain: string = '',
     path: string = '',
     creationTime: Date = new Date(),
@@ -211,7 +211,6 @@ export const formatCookieForStoring = async (
 
     return storeFormatCookie
   } catch (err) {
-    console.log(err)
     return null
   }
 }

@@ -18,7 +18,7 @@ const App = () => {
   useEffect(() => {
     let tstCookies = async () => {
       await cookieManager.insertCookiesFromHeader(
-        "A=B; path=/; expires=2022-03-19T13:06:49Z; domain=devadmin.wiredent.ro; secure, C=Z; path=/, E=G; path=/",
+        "A=B; path=/; expires=2022-03-11T13:06:49Z; domain=devadmin.wiredent.ro; secure, C=Z; path=/; secure, E=G; path=/",
         "https://devadmin.wiredent.ro/"
       )
       setCookies(true)
@@ -26,6 +26,21 @@ const App = () => {
 
     tstCookies()
   }, [])
+
+  useEffect(() => {
+    let tstCookies = async () => {
+      let cookies = await cookieManager.getConcatenatedCookies(
+        "https://devadmin.wiredent.ro/"
+      )
+    }
+    
+    if (cookies === true)
+      // setTimeout(() => {
+      //   tstCookies()
+      // }, 1000)
+      tstCookies()
+      
+  }, [cookies])
 
   return <View style={styles.rootContainer}>
     <Text>Test</Text>

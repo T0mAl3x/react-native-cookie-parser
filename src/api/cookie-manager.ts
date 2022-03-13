@@ -32,17 +32,21 @@ export class CookieManager implements RNCookieParserProps {
     }
   }
 
-  async removeExpiredCookiesFromStore() {
+  async removeExpiredCookiesFromStore(): Promise<void> {
     let existingCookies = await this.getCookiesFromStore()
+    console.log('removeExpiredCookiesFromStore')
     if (existingCookies) {
+      console.log(existingCookies)
       let updatedCookieList = [...existingCookies]
-      let currentDate = new Date().getMilliseconds()
+      let currentDate = new Date().getTime()
       for (let i = 0; i < existingCookies.length; i++) {
-        if (existingCookies[i].expiryTime.getMilliseconds() <= currentDate) {
-          updatedCookieList = updatedCookieList.slice(i, i + 1)
+        if (existingCookies[i].expiryTime.getTime() <= currentDate) {
+          console.log('Yes')
+          console.log(existingCookies[i])
+          updatedCookieList.splice(i, i + 1)
         }
       }
-
+      console.log(updatedCookieList)
       let formattedCookieList = updatedCookieList.map((cookie) =>
         cookie.toString()
       )
@@ -50,13 +54,14 @@ export class CookieManager implements RNCookieParserProps {
     }
   }
 
-  async savePackedCookiesToStore(packedCookies: string[]) {
+  async savePackedCookiesToStore(packedCookies: string[]): Promise<void> {
     if (packedCookies.length > 0) {
       let packedFormattedCookies = packedCookies.join(', ')
       await SInfo.setItem(this.PACKED_COOKIES_NAME, packedFormattedCookies, {
         sharedPreferencesName: 'auth-prefs',
         keychainService: 'auth-chain',
       })
+      console.log("savePackedCookiesToStore")
     }
   }
 
@@ -69,7 +74,7 @@ export class CookieManager implements RNCookieParserProps {
     // TODO mechanism of user agent settings
 
     // Check store for expired cookies
-    this.removeExpiredCookiesFromStore()
+    await this.removeExpiredCookiesFromStore()
 
     let existingCookies = await this.getCookiesFromStore()
     let computedCookies = computeCookieHeaderString(existingCookies, uri)
@@ -91,13 +96,10 @@ export class CookieManager implements RNCookieParserProps {
       keychainService: 'auth-chain',
     })
     if (!bulkCookiesFromStore) return null
-
     let cookiesFromStore = this.parseCookiesFromHeader(bulkCookiesFromStore)
     if (cookiesFromStore) {
       let cookies = cookiesFromStore.map((cookieFromStore) => {
         let cookieElements = cookieFromStore.split('; ')
-        console.log(cookieElements[2])
-        console.log(new Date(cookieElements[2]))
         let cookieObject: StoreFormatCookie = new StoreFormatCookie(
           cookieElements[0],
           cookieElements[1],
@@ -129,19 +131,16 @@ export class CookieManager implements RNCookieParserProps {
       let cookies = this.parseCookiesFromHeader(setCookieHeader)
       if (cookies && cookies.length > 0) {
         // Check store for expired cookies
-        this.removeExpiredCookiesFromStore()
+        await this.removeExpiredCookiesFromStore()
 
         // Initialize cookie list with existing cookies from store
         let existingCookies = await this.getCookiesFromStore()
         if (!existingCookies) existingCookies = []
 
-        console.log('Initialize cookie list with existing cookies from store')
-        console.log(existingCookies)
-
+        let currentDate = new Date().getTime()
         for (let i = 0; i < cookies.length; i++) {
           // Parse raw cookie from server
           let cookie = parseSetCookieHeader(cookies[i])
-          console.log(cookie)
           if (cookie) {
             // Prepare cookie for storage
             let canonicalDomain = canonicalizeDomain(domain)
@@ -179,6 +178,11 @@ export class CookieManager implements RNCookieParserProps {
                   existingCookies.splice(oldCookieIndex, oldCookieIndex + 1)
                 }
 
+                if (
+                  formattedCookie &&
+                  formattedCookie.expiryTime.getTime() <= currentDate
+                )
+                  continue
                 existingCookies.push(formattedCookie)
               }
             }
@@ -188,7 +192,6 @@ export class CookieManager implements RNCookieParserProps {
         let formattedCookiesForStoring: string[] = [
           ...existingCookies.map((cookieObject) => cookieObject.toString()),
         ]
-
         await this.savePackedCookiesToStore(formattedCookiesForStoring)
       }
     }

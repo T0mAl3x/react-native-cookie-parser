@@ -1,6 +1,7 @@
+import { URL } from 'react-native-url-polyfill'
+
 import {
   canonicalizeDomain,
-  getUriComponents,
   getUriPath,
   matchDomain,
   matchPath,
@@ -14,11 +15,9 @@ export const computeCookieHeaderString = (
   let cookieList: string[] = []
   if (existingCookies) {
     let canonicalizedDomain = canonicalizeDomain(uri)
-    let uriComponents = getUriComponents(uri)
-    let isSecureProtocol =
-      uriComponents && uriComponents.length > 2
-        ? uriComponents[1] === 'https'
-        : false
+
+    const url = new URL(uri)
+    let isSecureProtocol = url ? url.protocol === 'https:' : false
     let currentDateTime = new Date()
     existingCookies.forEach((cookie) => {
       /*
@@ -46,7 +45,7 @@ export const computeCookieHeaderString = (
         ((cookie.secureOnlyFlag && isSecureProtocol) || !cookie.secureOnlyFlag)
       ) {
         cookie.lastAccessTime = currentDateTime
-        cookieList.push(cookie.toString())
+        cookieList.push(`${cookie.name}=${cookie.value}`)
       }
     })
   }
