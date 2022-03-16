@@ -11,7 +11,7 @@ import { canonicalizeDomain } from '../subcomponent-algorithms'
 interface RNCookieParserProps {
   getConcatenatedCookies(domain: string): Promise<string | null>
   insertCookiesFromHeader(
-    setCookieHeader: string,
+    setCookieHeader: string[],
     domain: string
   ): Promise<void>
   clear(): Promise<void>
@@ -77,20 +77,13 @@ export class CookieManager implements RNCookieParserProps {
     return null
   }
 
-  parseCookiesFromHeader(setCookiesHeader: string): string[] | null {
-    // Separate cookies from bulk string
-    let cookies = setCookiesHeader.split(', ')
-
-    return cookies
-  }
-
   async getCookiesFromStore(): Promise<StoreFormatCookie[] | null> {
     let bulkCookiesFromStore = await SInfo.getItem(this.PACKED_COOKIES_NAME, {
       sharedPreferencesName: 'auth-prefs',
       keychainService: 'auth-chain',
     })
     if (!bulkCookiesFromStore) return null
-    let cookiesFromStore = this.parseCookiesFromHeader(bulkCookiesFromStore)
+    let cookiesFromStore = bulkCookiesFromStore.split(', ')
     if (cookiesFromStore) {
       let cookies = cookiesFromStore.map((cookieFromStore) => {
         let cookieElements = cookieFromStore.split('; ')
@@ -117,13 +110,12 @@ export class CookieManager implements RNCookieParserProps {
   }
 
   async insertCookiesFromHeader(
-    setCookieHeader: string,
+    setCookieHeader: string[],
     domain: string
   ): Promise<void> {
     if (setCookieHeader) {
       // await this.clear()
-      let cookies = this.parseCookiesFromHeader(setCookieHeader)
-      if (cookies && cookies.length > 0) {
+      if (setCookieHeader && setCookieHeader.length > 0) {
         // Check store for expired cookies
         await this.removeExpiredCookiesFromStore()
 
@@ -132,9 +124,9 @@ export class CookieManager implements RNCookieParserProps {
         if (!existingCookies) existingCookies = []
 
         let currentDate = new Date().getTime()
-        for (let i = 0; i < cookies.length; i++) {
+        for (let i = 0; i < setCookieHeader.length; i++) {
           // Parse raw cookie from server
-          let cookie = parseSetCookieHeader(cookies[i])
+          let cookie = parseSetCookieHeader(setCookieHeader[i])
           if (cookie) {
             // Prepare cookie for storage
             let canonicalDomain = canonicalizeDomain(domain)

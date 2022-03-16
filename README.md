@@ -17,7 +17,7 @@ This library is a basic cookie parser which uses the algorithms defined in RFC 6
 
     // Recommended to use inside a response interceptor
     await cookieManager.insertCookiesFromHeader(
-        "A=B; path=/; expires=2022-03-11T13:06:49Z; domain=example.ro; secure, C=Z; path=/; secure, E=G; path=/", 
+        ["A=B; path=/; expires=2022-03-11T13:06:49Z; domain=example.ro; secure", "C=Z; path=/; secure", "E=G; path=/"], 
         "https://example.ro/"
     )
 
