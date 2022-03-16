@@ -1,6 +1,6 @@
 {
   "name": "react-native-cookie-parser",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Basic cookie parser for react-native",
   "homepage": "https://github.com/T0mAl3x/react-native-cookie-parser#readme",
   "main": "lib/index.js",
